@@ -1,0 +1,7 @@
+1.0
+initial release. unpack embedded heightmap2stl.jar and execute.
+
+1.1
+add Xms and Xmx java memory heap settings
+add AutoBackup setting - replaces prompt to user to replace existing STL file
+validate heightmap2stl binary matches md5 of embedded version

@@ -1,36 +1,41 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace app
 {
-    static class Program
-    {
-        [STAThread]
-        static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Main());
-        }
-    }
-
     public partial class Main : Form
     {
+        private const string DefaultXms = "64m";
+        private const string DefaultXmx = "8g";
+        private const string EmbeddedResourceName = "app.heightmap2stl.jar";
         private Process _p;
+        private bool _autoBackup = true;
 
         public Main()
         {
             InitializeComponent();
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            Boolean.TryParse(ConfigurationManager.AppSettings["AutoBackup"], out _autoBackup);
+            AppendLog($"AutoBackup: {_autoBackup}");
         }
 
         protected override void OnClosing(CancelEventArgs e)
@@ -56,41 +61,54 @@ namespace app
             }
 
             var rawFileName = new FileInfo(txtFile.Text);
-            var stlFilePath = Path.GetFileNameWithoutExtension(rawFileName.FullName) + ".stl";
-            if (File.Exists(stlFilePath))
-            {
-                var overwrite = MessageBox.Show(this,
-                    "Do you want to overwrite?" + Path.GetFileName(stlFilePath),
-                    "File Exists",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            var stlFile = new FileInfo(Path.Combine(Environment.CurrentDirectory,
+                Path.GetFileNameWithoutExtension(rawFileName.FullName) + ".stl"));
 
-                if (overwrite == DialogResult.No)
+            var backupStlFile = new FileInfo(Path.Combine(
+                // Directory
+                stlFile.DirectoryName,
+                // FileName
+                Path.GetFileNameWithoutExtension(stlFile.Name) +
+                Regex.Replace(stlFile.LastWriteTime.ToString("s"), "[^a-zA-Z0-9]+", "-") +
+                Path.GetExtension(stlFile.Name)
+                ));
+
+            if (_autoBackup)
+            {
+                if (stlFile.Exists && !backupStlFile.Exists)
                 {
-                    AppendLog("Info: Operation Cancelled. Prevented overwriting existing STL file.");
-                    return;
+                    stlFile.MoveTo(backupStlFile.FullName);
+                    AppendLog($"Info: A STL file with the name {stlFile.Name} already existed, and was renamed to {backupStlFile}");
                 }
             }
 
-            ExtractBinary();
-
-            btnCreate.Enabled = false;
-            btnCancel.Enabled = true;
-
-            Task.Factory.StartNew(RunExport).ContinueWith((ancestor, _) =>
+            if (EnsureHeightmap2StlBinary())
             {
-                btnCreate.Enabled = true;
-                btnCancel.Enabled = false;
-            },
-            null,
-            TaskScheduler.FromCurrentSynchronizationContext());
+                btnCreate.Enabled = false;
+                btnCancel.Enabled = true;
+
+                Task.Factory.StartNew(RunExport).ContinueWith((ancestor, _) =>
+                    {
+                        btnCreate.Enabled = true;
+                        btnCancel.Enabled = false;
+                        if (ancestor.IsCompleted)
+                        {
+                            AppendLog($"Created STL file {stlFile.FullName}");
+                        }
+                    },
+                    null,
+                    TaskScheduler.FromCurrentSynchronizationContext());
+            }
         }
 
         private void RunExport()
         {
             var rawFileName = new FileInfo(txtFile.Text);
             _p = new Process();
+            _p.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
             _p.StartInfo.FileName = "java.exe";
             _p.StartInfo.Arguments = string.Join(" ",
+                JavaSystemProperties(),
                 "-jar",
                 $"\"{AppTempPath()}\"",
                 $"\"{rawFileName.FullName}\"",
@@ -104,6 +122,7 @@ namespace app
             _p.OutputDataReceived += OnDataReceived;
             _p.ErrorDataReceived += OnDataReceived;
             _p.Start();
+            AppendLog(_p.StartInfo.FileName + " " + _p.StartInfo.Arguments);
             _p.BeginOutputReadLine();
             _p.BeginErrorReadLine();
             _p.WaitForExit(360000);
@@ -135,6 +154,39 @@ namespace app
                 txtLog.Clear();
         }
 
+        private string JavaSystemProperties()
+        {
+            var settings = ConfigurationManager.AppSettings;
+            var validSize = new Regex(@"\d+[kKmMgG]");
+            var properties = new Dictionary<string, string>();
+
+            // Process each setting
+            var rawXms = settings["Xms"];
+            if (validSize.IsMatch(rawXms))
+            {
+                properties["Xms"] = rawXms;
+            }
+            else
+            {
+                properties["Xms"] = DefaultXms;
+                AppendLog("User-supplied Xms is invalid. Using default: " + DefaultXms);
+            }
+
+            var rawXmx = settings["Xmx"];
+            if (validSize.IsMatch(rawXmx))
+            {
+                properties["Xmx"] = rawXmx;
+            }
+            else
+            {
+                properties["Xmx"] = DefaultXmx;
+                AppendLog("User-supplied Xmx is invalid. Using default: " + DefaultXmx);
+            }
+
+            // Prefix all the values with -D and combine with spaces
+            return String.Join(" ", properties.Select(x => "-D" + x.Key + "=" + x.Value));
+        }
+
         private bool FindJavaRuntime()
         {
             try
@@ -152,15 +204,57 @@ namespace app
             return false;
         }
 
-        private void ExtractBinary()
+        private Stream EmbeddedHeightmap2StlBinary()
+        {
+            var asm = Assembly.GetEntryAssembly();
+            return asm.GetManifestResourceStream(EmbeddedResourceName);
+        }
+
+        private bool EnsureHeightmap2StlBinary()
         {
             string path = AppTempPath();
-            if (File.Exists(path)) return;
-            var asm = Assembly.GetEntryAssembly();
-            using (Stream app = asm.GetManifestResourceStream("app.heightmap2stl.jar"))
+            if (File.Exists(path))
+            {
+                if (BinaryMatchesEmbeddedVersion(path) == false)
+                {
+                    AppendLog("Warning: Heightmap2STL.jar already exists, but doesn't match embedded version.");
+                    AppendLog($"Current path: {path}");
+                    AppendLog($"Current hash: {Md5HashFile(path)}");
+                    AppendLog($"Embedded hash: {EmbeddedHeightmap2StlBinaryHash()}");
+
+                    DialogResult result =
+                        MessageBox.Show(this,
+                            "The embedded version of Heightmap2STL doesn't match the temporarily unpacked version at '" +
+                            path + "'.\n" +
+                            "Do you want to overwrite this file with a trusted version?",
+                            "Heightmap2STL",
+                            MessageBoxButtons.YesNo);
+                    if (result == DialogResult.No)
+                    {
+                        AppendLog("Info: Operation Cancelled. Prevented overwriting existing STL file.");
+                        return false;
+                    }
+                }
+            }
+
+            using (Stream app = EmbeddedHeightmap2StlBinary())
             using (Stream writer = File.OpenWrite(path))
             {
                 app?.CopyTo(writer);
+            }
+            return BinaryMatchesEmbeddedVersion(path);
+        }
+
+        private bool BinaryMatchesEmbeddedVersion(string path)
+        {
+            return Md5HashFile(path) == EmbeddedHeightmap2StlBinaryHash();
+        }
+
+        private string EmbeddedHeightmap2StlBinaryHash()
+        {
+            using (Stream binary = EmbeddedHeightmap2StlBinary())
+            {
+                return Md5HashStream(binary);
             }
         }
 
@@ -193,6 +287,34 @@ namespace app
         private void KillChildProcess()
         {
             _p?.Kill();
+        }
+
+        private static string Md5HashFile(string filePathName)
+        {
+            using (var stream = File.OpenRead(filePathName))
+                return Md5HashStream(stream);
+        }
+
+        private static string Md5HashStream(Stream stream)
+        {
+            using (var md5 = MD5.Create())
+            {
+                var hash = md5.ComputeHash(stream);
+                return BitConverter.ToString(hash);
+            }
+        }
+    }
+}
+namespace app
+{
+    static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new Main());
         }
     }
 }
