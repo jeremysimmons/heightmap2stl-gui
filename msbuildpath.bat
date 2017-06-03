@@ -1,12 +1,12 @@
 @echo off
 
-reg.exe query "HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\4.0" /v MSBuildToolsPath > nul 2>&1
+reg.exe query "HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\14.0" /v MSBuildToolsPath > nul 2>&1
 if ERRORLEVEL 1 goto MissingMSBuildRegistry
 
-for /f "skip=2 tokens=2,*" %%A in ('reg.exe query "HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\4.0" /v MSBuildToolsPath') do SET MSBUILDDIR=%%B
+for /f "skip=2 tokens=2,*" %%A in ('reg.exe query "HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\14.0" /v MSBuildToolsPath') do SET "MSBUILDDIR=%%B"
 
-IF NOT EXIST %MSBUILDDIR%nul goto MissingMSBuildToolsPath
-IF NOT EXIST %MSBUILDDIR%msbuild.exe goto MissingMSBuildExe
+IF NOT EXIST "%MSBUILDDIR%" goto MissingMSBuildToolsPath
+IF NOT EXIST "%MSBUILDDIR%msbuild.exe" goto MissingMSBuildExe
 
 exit /b 0
 
