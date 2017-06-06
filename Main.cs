@@ -13,8 +13,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace app
 {
@@ -217,32 +217,29 @@ namespace app
             {
                 if (BinaryMatchesEmbeddedVersion(path) == false)
                 {
-                    AppendLog("Warning: Heightmap2STL.jar already exists, but doesn't match embedded version.");
-                    AppendLog($"Current path: {path}");
+                    AppendLog("Warning: Replacing heightmap2stl.jar at {path}.");
                     AppendLog($"Current hash: {Md5HashFile(path)}");
                     AppendLog($"Embedded hash: {EmbeddedHeightmap2StlBinaryHash()}");
-
-                    DialogResult result =
-                        MessageBox.Show(this,
-                            "The embedded version of Heightmap2STL doesn't match the temporarily unpacked version at '" +
-                            path + "'.\n" +
-                            "Do you want to overwrite this file with a trusted version?",
-                            "Heightmap2STL",
-                            MessageBoxButtons.YesNo);
-                    if (result == DialogResult.No)
-                    {
-                        AppendLog("Info: Operation Cancelled. Prevented overwriting existing STL file.");
-                        return false;
-                    }
+                    File.Delete(path);
+                    CopyEmbeddedHeightmap2StlBinaryToTemp(path);
+                    AppendLog($"Replaced");
                 }
             }
+            else
+                CopyEmbeddedHeightmap2StlBinaryToTemp(path);
 
+            return BinaryMatchesEmbeddedVersion(path);
+        }
+
+        private void CopyEmbeddedHeightmap2StlBinaryToTemp(string path)
+        {
             using (Stream app = EmbeddedHeightmap2StlBinary())
             using (Stream writer = File.OpenWrite(path))
             {
                 app?.CopyTo(writer);
             }
-            return BinaryMatchesEmbeddedVersion(path);
+            AppendLog($"Deployed heightmap2stl.jar with hash: {Md5HashFile(path)}");
+
         }
 
         private bool BinaryMatchesEmbeddedVersion(string path)
@@ -300,7 +297,7 @@ namespace app
             using (var md5 = MD5.Create())
             {
                 var hash = md5.ComputeHash(stream);
-                return BitConverter.ToString(hash);
+                return BitConverter.ToString(hash).Replace("-", "");
             }
         }
     }
