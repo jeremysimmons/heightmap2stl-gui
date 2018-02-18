@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.WindowsAPICodePack.Dialogs;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Configuration;
@@ -13,8 +14,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 namespace app
 {
@@ -29,13 +30,30 @@ namespace app
         public Main()
         {
             InitializeComponent();
+            txtOutput.Text = OutputDirectory();
+            AllowDrop = true;
+            DragEnter += new DragEventHandler(Main_DragEnter);
+            DragDrop += new DragEventHandler(Main_DragDrop);
+        }
+
+        void Main_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy;
+        }
+
+        void Main_DragDrop(object sender, DragEventArgs e)
+        {
+            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            txtFile.Text = files.First();
+            UpdateOutputPath();
         }
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
             Boolean.TryParse(ConfigurationManager.AppSettings["AutoBackup"], out _autoBackup);
-            AppendLog($"AutoBackup: {_autoBackup}");
+            chkAutoBackup.Checked = _autoBackup;
+            Log($"AutoBackup: {_autoBackup}");
         }
 
         protected override void OnClosing(CancelEventArgs e)
@@ -50,13 +68,13 @@ namespace app
 
             if (FindJavaRuntime() == false)
             {
-                AppendLog("JAVA cannot be found. Download/Install from https://java.com");
+                Log("JAVA cannot be found. Download/Install from https://java.com");
                 return;
             }
 
-            if (string.IsNullOrEmpty(txtFile.Text))
+            if (String.IsNullOrEmpty(txtFile.Text))
             {
-                AppendLog("Error: Heightmap Source is empty");
+                Log("Error: Heightmap Source is empty");
                 return;
             }
 
@@ -78,7 +96,7 @@ namespace app
                 if (stlFile.Exists && !backupStlFile.Exists)
                 {
                     stlFile.MoveTo(backupStlFile.FullName);
-                    AppendLog($"Info: A STL file with the name {stlFile.Name} already existed, and was renamed to {backupStlFile}");
+                    Log($"Info: A STL file with the name {stlFile.Name} already existed, and was renamed to {backupStlFile}");
                 }
             }
 
@@ -93,7 +111,7 @@ namespace app
                         btnCancel.Enabled = false;
                         if (ancestor.IsCompleted)
                         {
-                            AppendLog($"Created STL file {stlFile.FullName}");
+                            Log($"Created STL file {stlFile.FullName}");
                         }
                     },
                     null,
@@ -122,7 +140,7 @@ namespace app
             _p.OutputDataReceived += OnDataReceived;
             _p.ErrorDataReceived += OnDataReceived;
             _p.Start();
-            AppendLog(_p.StartInfo.FileName + " " + _p.StartInfo.Arguments);
+            Log(_p.StartInfo.FileName + " " + _p.StartInfo.Arguments);
             _p.BeginOutputReadLine();
             _p.BeginErrorReadLine();
             _p.WaitForExit(360000);
@@ -135,13 +153,13 @@ namespace app
             if (args.Data == null)
                 return;
 
-            AppendLog(args.Data);
+            Log(args.Data);
         }
 
-        private void AppendLog(string text)
+        private void Log(string text)
         {
             if (txtLog.InvokeRequired)
-                txtLog.Invoke(new Action<string>(AppendLog), text);
+                txtLog.Invoke(new Action<string>(Log), text);
             else
                 txtLog.AppendText(text + Environment.NewLine);
         }
@@ -169,7 +187,7 @@ namespace app
             else
             {
                 properties["Xms"] = DefaultXms;
-                AppendLog("User-supplied Xms is invalid. Using default: " + DefaultXms);
+                Log("User-supplied Xms is invalid. Using default: " + DefaultXms);
             }
 
             var rawXmx = settings["Xmx"];
@@ -180,7 +198,7 @@ namespace app
             else
             {
                 properties["Xmx"] = DefaultXmx;
-                AppendLog("User-supplied Xmx is invalid. Using default: " + DefaultXmx);
+                Log("User-supplied Xmx is invalid. Using default: " + DefaultXmx);
             }
 
             // Prefix all the values with -D and combine with spaces
@@ -217,12 +235,12 @@ namespace app
             {
                 if (BinaryMatchesEmbeddedVersion(path) == false)
                 {
-                    AppendLog("Warning: Replacing heightmap2stl.jar at {path}.");
-                    AppendLog($"Current hash: {Md5HashFile(path)}");
-                    AppendLog($"Embedded hash: {EmbeddedHeightmap2StlBinaryHash()}");
+                    Log("Warning: Replacing heightmap2stl.jar at {path}.");
+                    Log($"Current hash: {Md5HashFile(path)}");
+                    Log($"Embedded hash: {EmbeddedHeightmap2StlBinaryHash()}");
                     File.Delete(path);
                     CopyEmbeddedHeightmap2StlBinaryToTemp(path);
-                    AppendLog($"Replaced");
+                    Log($"Replaced");
                 }
             }
             else
@@ -238,7 +256,7 @@ namespace app
             {
                 app?.CopyTo(writer);
             }
-            AppendLog($"Deployed heightmap2stl.jar with hash: {Md5HashFile(path)}");
+            Log($"Deployed heightmap2stl.jar with hash: {Md5HashFile(path)}");
 
         }
 
@@ -277,8 +295,8 @@ namespace app
         private void btnCancel_Click(object sender, EventArgs e)
         {
             KillChildProcess();
-            AppendLog(new string('-', 20));
-            AppendLog("Warning: User cancelled processing");
+            Log(new string('-', 20));
+            Log("Warning: User cancelled processing");
         }
 
         private void KillChildProcess()
@@ -300,6 +318,71 @@ namespace app
                 return BitConverter.ToString(hash).Replace("-", "");
             }
         }
+
+        private void btnCustom_Click(object sender, EventArgs e)
+        {
+            CommonOpenFileDialog dialog = new CommonOpenFileDialog();
+            dialog.InitialDirectory = "C:\\Users";
+            dialog.IsFolderPicker = true;
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                txtOutput.Text = dialog.FileName;
+            }
+            else
+            {
+                if(String.IsNullOrEmpty(txtOutput.Text))
+                {
+                    txtOutput.Text = Environment.CurrentDirectory;
+                }
+            }
+        }
+
+        private string OutputDirectory()
+        {
+            if (radOutProgram.Checked)
+            {
+                return Environment.CurrentDirectory;
+            }
+            // same as input file
+            if(radOutSource.Checked)
+            {
+                // input file might not be set yet, fallback to current directory
+                if (String.IsNullOrEmpty(txtFile.Text))
+                {
+                    return Environment.CurrentDirectory;
+                }
+                else
+                {
+                    // Use the directory of the input file if it's available, otherwise current directory
+                    return InputFile()?.DirectoryName ?? Environment.CurrentDirectory;
+                }
+            }
+
+            if(radOutCustom.Checked)
+            {
+                return txtOutput.Text;
+            }
+
+            // Final fallback
+            return Environment.CurrentDirectory;
+        }
+        private FileInfo InputFile()
+        {
+            return 
+                String.IsNullOrEmpty(txtFile.Text) ? 
+                null : 
+                new FileInfo(txtFile.Text);
+        }
+
+        private void radOutput_Click(object sender, EventArgs e)
+        {
+            UpdateOutputPath();
+        }
+
+        private void UpdateOutputPath()
+        {
+            txtOutput.Text = OutputDirectory();
+        }
     }
 }
 namespace app
@@ -309,6 +392,8 @@ namespace app
         [STAThread]
         static void Main()
         {
+            // The rest of the program assumes CurrentDirectory is the directory the exe is in
+            Environment.CurrentDirectory = Path.GetDirectoryName(Environment.GetCommandLineArgs()[0]);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Main());
