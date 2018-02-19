@@ -14,8 +14,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 
 namespace app
 {
@@ -31,17 +31,14 @@ namespace app
         {
             InitializeComponent();
             txtOutput.Text = OutputDirectory();
-            AllowDrop = true;
-            DragEnter += new DragEventHandler(Main_DragEnter);
-            DragDrop += new DragEventHandler(Main_DragDrop);
         }
 
-        void Main_DragEnter(object sender, DragEventArgs e)
+        private void Main_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy;
         }
 
-        void Main_DragDrop(object sender, DragEventArgs e)
+        private void Main_DragDrop(object sender, DragEventArgs e)
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
             txtFile.Text = files.First();
@@ -66,7 +63,7 @@ namespace app
         {
             ClearLog();
 
-            if (FindJavaRuntime() == false)
+            if (CheckForJavaInPath() == false)
             {
                 Log("JAVA cannot be found. Download/Install from https://java.com");
                 return;
@@ -78,21 +75,26 @@ namespace app
                 return;
             }
 
-            var rawFileName = new FileInfo(txtFile.Text);
-            var stlFile = new FileInfo(Path.Combine(Environment.CurrentDirectory,
-                Path.GetFileNameWithoutExtension(rawFileName.FullName) + ".stl"));
+            var rawFileName = InputFile();
+            var outDirectory = OutputDirectory();
+            Log($"Input File: {rawFileName}");
+            Log($"Output Path: {outDirectory}");
 
-            var backupStlFile = new FileInfo(Path.Combine(
-                // Directory
-                stlFile.DirectoryName,
-                // FileName
-                Path.GetFileNameWithoutExtension(stlFile.Name) +
-                Regex.Replace(stlFile.LastWriteTime.ToString("s"), "[^a-zA-Z0-9]+", "-") +
-                Path.GetExtension(stlFile.Name)
-                ));
+            var stlFile = new FileInfo(Path.Combine(outDirectory,
+                Path.GetFileNameWithoutExtension(rawFileName.FullName) + ".stl"));
 
             if (_autoBackup)
             {
+                Log($"Autobackup: {_autoBackup}");
+                var backupStlFile = new FileInfo(Path.Combine(
+                    // Directory
+                    outDirectory,
+                    // FileName
+                    Path.GetFileNameWithoutExtension(stlFile.Name) +
+                        Regex.Replace(stlFile.LastWriteTime.ToString("s"), "[^a-zA-Z0-9]+", "-") +
+                        stlFile.Extension
+                    ));
+
                 if (stlFile.Exists && !backupStlFile.Exists)
                 {
                     stlFile.MoveTo(backupStlFile.FullName);
@@ -156,20 +158,30 @@ namespace app
             Log(args.Data);
         }
 
+        // CrossThreadSafe
         private void Log(string text)
         {
             if (txtLog.InvokeRequired)
+            {
                 txtLog.Invoke(new Action<string>(Log), text);
+            }
             else
+            {
                 txtLog.AppendText(text + Environment.NewLine);
+            }
         }
 
+        // CrossThreadSafe
         private void ClearLog()
         {
             if (txtLog.InvokeRequired)
+            {
                 txtLog.Invoke(new Action(ClearLog));
+            }
             else
+            {
                 txtLog.Clear();
+            }
         }
 
         private string JavaSystemProperties()
@@ -205,7 +217,8 @@ namespace app
             return String.Join(" ", properties.Select(x => "-D" + x.Key + "=" + x.Value));
         }
 
-        private bool FindJavaRuntime()
+        // A standard java install will add java.exe to %PATH%
+        private bool CheckForJavaInPath()
         {
             try
             {
@@ -244,7 +257,9 @@ namespace app
                 }
             }
             else
+            {
                 CopyEmbeddedHeightmap2StlBinaryToTemp(path);
+            }
 
             return BinaryMatchesEmbeddedVersion(path);
         }
@@ -343,6 +358,7 @@ namespace app
             {
                 return Environment.CurrentDirectory;
             }
+
             // same as input file
             if(radOutSource.Checked)
             {
@@ -351,11 +367,9 @@ namespace app
                 {
                     return Environment.CurrentDirectory;
                 }
-                else
-                {
-                    // Use the directory of the input file if it's available, otherwise current directory
-                    return InputFile()?.DirectoryName ?? Environment.CurrentDirectory;
-                }
+                
+                // Use the directory of the input file if it's available, otherwise current directory
+                return InputFile()?.DirectoryName ?? Environment.CurrentDirectory;
             }
 
             if(radOutCustom.Checked)
@@ -366,6 +380,7 @@ namespace app
             // Final fallback
             return Environment.CurrentDirectory;
         }
+
         private FileInfo InputFile()
         {
             return 
