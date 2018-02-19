@@ -14,8 +14,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.3.1.0")]
-[assembly: AssemblyFileVersion("1.3.1.0")]
+[assembly: AssemblyVersion("1.3.2.0")]
+[assembly: AssemblyFileVersion("1.3.2.0")]
 
 namespace app
 {
@@ -26,32 +26,44 @@ namespace app
         private const string EmbeddedResourceName = "app.heightmap2stl.jar";
         private Process _p;
         private bool _autoBackup = true;
+        private string _lastCustom;
 
         public Main()
         {
             InitializeComponent();
-            txtOutput.Text = OutputDirectory();
         }
 
         private void Main_DragEnter(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy;
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effect = DragDropEffects.Copy;
+            }
         }
 
         private void Main_DragDrop(object sender, DragEventArgs e)
         {
-            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            txtFile.Text = files.First();
-            UpdateOutputPath();
+            SetInputPath((e.Data.GetData(DataFormats.FileDrop) as string[])?.FirstOrDefault());
         }
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+            
+            // Initial output path
+            SetOutputPath(GetOutputPath());
+
+            // Version
+            Text += $" {GetVersion()}";
+            Log($"Version: {GetVersion()}");
+
+            // Autobackup
             Boolean.TryParse(ConfigurationManager.AppSettings["AutoBackup"], out _autoBackup);
             chkAutoBackup.Checked = _autoBackup;
             Log($"AutoBackup: {_autoBackup}");
         }
+
+        private Version GetVersion() => Assembly.GetEntryAssembly().GetName().Version;
 
         protected override void OnClosing(CancelEventArgs e)
         {
@@ -69,14 +81,14 @@ namespace app
                 return;
             }
 
-            if (String.IsNullOrEmpty(txtFile.Text))
+            if (GetInputFile() == null)
             {
                 Log("Error: Heightmap Source is empty");
                 return;
             }
 
-            var rawFileName = InputFile();
-            var outDirectory = OutputDirectory();
+            var rawFileName = GetInputFile();
+            var outDirectory = GetOutputPath();
             Log($"Input File: {rawFileName}");
             Log($"Output Path: {outDirectory}");
 
@@ -123,14 +135,14 @@ namespace app
 
         private void RunExport()
         {
-            var rawFileName = new FileInfo(txtFile.Text);
+            var rawFileName = GetInputFile();
             _p = new Process();
             _p.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
             _p.StartInfo.FileName = "java.exe";
             _p.StartInfo.Arguments = string.Join(" ",
                 JavaSystemProperties(),
                 "-jar",
-                $"\"{AppTempPath()}\"",
+                $"\"{GetAppTempPath()}\"",
                 $"\"{rawFileName.FullName}\"",
                 numModelHeight.Text,
                 numBaseHeight.Text
@@ -243,7 +255,7 @@ namespace app
 
         private bool EnsureHeightmap2StlBinary()
         {
-            string path = AppTempPath();
+            string path = GetAppTempPath();
             if (File.Exists(path))
             {
                 if (BinaryMatchesEmbeddedVersion(path) == false)
@@ -288,7 +300,7 @@ namespace app
             }
         }
 
-        private static string AppTempPath()
+        private static string GetAppTempPath()
         {
             return Path.Combine(Environment.GetEnvironmentVariable("TEMP"), "heightmap2stl.jar");
         }
@@ -303,7 +315,7 @@ namespace app
             using (FileDialog d = new OpenFileDialog())
             {
                 if (DialogResult.OK != d.ShowDialog()) return;
-                txtFile.Text = d.FileName;
+                SetInputPath(d.FileName);
             }
         }
 
@@ -337,22 +349,63 @@ namespace app
         private void btnCustom_Click(object sender, EventArgs e)
         {
             CommonOpenFileDialog dialog = new CommonOpenFileDialog();
-            dialog.InitialDirectory = "C:\\Users";
+            dialog.InitialDirectory = GetOutputPath();
             dialog.IsFolderPicker = true;
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                txtOutput.Text = dialog.FileName;
+                if (!radOutCustom.Checked)
+                {
+                    radOutCustom.Checked = true;
+                }
+                SetOutputPath(dialog.FileName);
             }
             else
             {
-                if(String.IsNullOrEmpty(txtOutput.Text))
+                if(GetOutputPath() != Environment.CurrentDirectory)
                 {
-                    txtOutput.Text = Environment.CurrentDirectory;
+                    SetOutputPath(Environment.CurrentDirectory);
                 }
             }
         }
 
-        private string OutputDirectory()
+        private void radOutput_Click(object sender, EventArgs e)
+        {
+            if (radOutCustom.Checked)
+            {
+                SetOutputPath(_lastCustom);
+                if (GetOutputPath() == Environment.CurrentDirectory)
+                {
+                    Log("Rember to set your custom path");
+                }
+            }
+
+            UpdateOutputPath();
+        }
+
+        private void SetInputPath(string fileName)
+        {
+            txtInputFile.Text = fileName;
+            UpdateOutputPath();
+        }
+
+        private FileInfo GetInputFile()
+        {
+            return 
+                String.IsNullOrEmpty(txtInputFile.Text) ? 
+                    null : 
+                    new FileInfo(txtInputFile.Text);
+        }
+
+        private void SetOutputPath(string outputPath)
+        {
+            txtOutputPath.Text = outputPath;
+            if (radOutCustom.Checked)
+            {
+                _lastCustom = outputPath;
+            }
+        }
+
+        private string GetOutputPath()
         {
             if (radOutProgram.Checked)
             {
@@ -363,40 +416,34 @@ namespace app
             if(radOutSource.Checked)
             {
                 // input file might not be set yet, fallback to current directory
-                if (String.IsNullOrEmpty(txtFile.Text))
+                var inputFile = GetInputFile();
+                if (inputFile == null)
                 {
+                    Log("No Input image specified. Output path will update when input is selected.");
                     return Environment.CurrentDirectory;
                 }
                 
                 // Use the directory of the input file if it's available, otherwise current directory
-                return InputFile()?.DirectoryName ?? Environment.CurrentDirectory;
+                return inputFile.DirectoryName ?? Environment.CurrentDirectory;
             }
 
             if(radOutCustom.Checked)
             {
-                return txtOutput.Text;
+                if (string.IsNullOrEmpty(txtOutputPath.Text))
+                {
+                    return Environment.CurrentDirectory;
+                }
+
+                return txtOutputPath.Text;
             }
 
             // Final fallback
             return Environment.CurrentDirectory;
         }
 
-        private FileInfo InputFile()
-        {
-            return 
-                String.IsNullOrEmpty(txtFile.Text) ? 
-                null : 
-                new FileInfo(txtFile.Text);
-        }
-
-        private void radOutput_Click(object sender, EventArgs e)
-        {
-            UpdateOutputPath();
-        }
-
         private void UpdateOutputPath()
         {
-            txtOutput.Text = OutputDirectory();
+            txtOutputPath.Text = GetOutputPath();
         }
     }
 }

@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             this.btnCreate = new System.Windows.Forms.Button();
-            this.txtFile = new System.Windows.Forms.TextBox();
+            this.txtInputFile = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.btnPick = new System.Windows.Forms.Button();
             this.hostSoftwareSite = new System.Windows.Forms.LinkLabel();
@@ -44,7 +44,7 @@
             this.chkAutoBackup = new System.Windows.Forms.CheckBox();
             this.gbOutputPath = new System.Windows.Forms.GroupBox();
             this.btnCustom = new System.Windows.Forms.Button();
-            this.txtOutput = new System.Windows.Forms.TextBox();
+            this.txtOutputPath = new System.Windows.Forms.TextBox();
             this.radOutCustom = new System.Windows.Forms.RadioButton();
             this.radOutSource = new System.Windows.Forms.RadioButton();
             this.radOutProgram = new System.Windows.Forms.RadioButton();
@@ -65,16 +65,16 @@
             this.btnCreate.UseVisualStyleBackColor = true;
             this.btnCreate.Click += new System.EventHandler(this.btnCreate_Click);
             // 
-            // txtFile
+            // txtInputFile
             // 
-            this.txtFile.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.txtInputFile.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtFile.Location = new System.Drawing.Point(9, 25);
-            this.txtFile.Margin = new System.Windows.Forms.Padding(2);
-            this.txtFile.Name = "txtFile";
-            this.txtFile.ReadOnly = true;
-            this.txtFile.Size = new System.Drawing.Size(319, 20);
-            this.txtFile.TabIndex = 1;
+            this.txtInputFile.Location = new System.Drawing.Point(9, 25);
+            this.txtInputFile.Margin = new System.Windows.Forms.Padding(2);
+            this.txtInputFile.Name = "txtInputFile";
+            this.txtInputFile.ReadOnly = true;
+            this.txtInputFile.Size = new System.Drawing.Size(319, 20);
+            this.txtInputFile.TabIndex = 1;
             // 
             // label1
             // 
@@ -102,7 +102,7 @@
             // 
             this.hostSoftwareSite.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.hostSoftwareSite.AutoSize = true;
-            this.hostSoftwareSite.Location = new System.Drawing.Point(47, 297);
+            this.hostSoftwareSite.Location = new System.Drawing.Point(49, 336);
             this.hostSoftwareSite.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.hostSoftwareSite.Name = "hostSoftwareSite";
             this.hostSoftwareSite.Size = new System.Drawing.Size(72, 13);
@@ -123,7 +123,7 @@
             this.txtLog.Name = "txtLog";
             this.txtLog.ReadOnly = true;
             this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtLog.Size = new System.Drawing.Size(404, 118);
+            this.txtLog.Size = new System.Drawing.Size(404, 157);
             this.txtLog.TabIndex = 10;
             // 
             // numBaseHeight
@@ -181,7 +181,7 @@
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.Enabled = false;
-            this.btnCancel.Location = new System.Drawing.Point(360, 292);
+            this.btnCancel.Location = new System.Drawing.Point(360, 331);
             this.btnCancel.Margin = new System.Windows.Forms.Padding(2);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(53, 23);
@@ -194,7 +194,7 @@
             // 
             this.label5.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(6, 297);
+            this.label5.Location = new System.Drawing.Point(8, 336);
             this.label5.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(37, 13);
@@ -217,7 +217,7 @@
             // gbOutputPath
             // 
             this.gbOutputPath.Controls.Add(this.btnCustom);
-            this.gbOutputPath.Controls.Add(this.txtOutput);
+            this.gbOutputPath.Controls.Add(this.txtOutputPath);
             this.gbOutputPath.Controls.Add(this.radOutCustom);
             this.gbOutputPath.Controls.Add(this.radOutSource);
             this.gbOutputPath.Controls.Add(this.radOutProgram);
@@ -239,16 +239,16 @@
             this.btnCustom.UseVisualStyleBackColor = true;
             this.btnCustom.Click += new System.EventHandler(this.btnCustom_Click);
             // 
-            // txtOutput
+            // txtOutputPath
             // 
-            this.txtOutput.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.txtOutputPath.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtOutput.Location = new System.Drawing.Point(5, 42);
-            this.txtOutput.Margin = new System.Windows.Forms.Padding(2);
-            this.txtOutput.Name = "txtOutput";
-            this.txtOutput.ReadOnly = true;
-            this.txtOutput.Size = new System.Drawing.Size(392, 20);
-            this.txtOutput.TabIndex = 22;
+            this.txtOutputPath.Location = new System.Drawing.Point(5, 42);
+            this.txtOutputPath.Margin = new System.Windows.Forms.Padding(2);
+            this.txtOutputPath.Name = "txtOutputPath";
+            this.txtOutputPath.ReadOnly = true;
+            this.txtOutputPath.Size = new System.Drawing.Size(392, 20);
+            this.txtOutputPath.TabIndex = 22;
             // 
             // radOutCustom
             // 
@@ -293,7 +293,7 @@
             this.AllowDrop = true;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(417, 322);
+            this.ClientSize = new System.Drawing.Size(417, 360);
             this.Controls.Add(this.gbOutputPath);
             this.Controls.Add(this.chkAutoBackup);
             this.Controls.Add(this.label5);
@@ -307,7 +307,7 @@
             this.Controls.Add(this.hostSoftwareSite);
             this.Controls.Add(this.btnPick);
             this.Controls.Add(this.label1);
-            this.Controls.Add(this.txtFile);
+            this.Controls.Add(this.txtInputFile);
             this.Controls.Add(this.btnCreate);
             this.Margin = new System.Windows.Forms.Padding(2);
             this.Name = "Main";
@@ -326,7 +326,7 @@
         #endregion
 
         private System.Windows.Forms.Button btnCreate;
-        private System.Windows.Forms.TextBox txtFile;
+        private System.Windows.Forms.TextBox txtInputFile;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button btnPick;
         private System.Windows.Forms.LinkLabel hostSoftwareSite;
@@ -341,7 +341,7 @@
         private System.Windows.Forms.CheckBox chkAutoBackup;
         private System.Windows.Forms.GroupBox gbOutputPath;
         private System.Windows.Forms.Button btnCustom;
-        private System.Windows.Forms.TextBox txtOutput;
+        private System.Windows.Forms.TextBox txtOutputPath;
         private System.Windows.Forms.RadioButton radOutCustom;
         private System.Windows.Forms.RadioButton radOutSource;
         private System.Windows.Forms.RadioButton radOutProgram;
