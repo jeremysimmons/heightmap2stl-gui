@@ -14,8 +14,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.3.2.0")]
-[assembly: AssemblyFileVersion("1.3.2.0")]
+[assembly: AssemblyVersion("1.3.3.0")]
+[assembly: AssemblyFileVersion("1.3.3.0")]
 
 namespace app
 {
@@ -137,7 +137,7 @@ namespace app
         {
             var rawFileName = GetInputFile();
             _p = new Process();
-            _p.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
+            _p.StartInfo.WorkingDirectory = GetOutputPath();
             _p.StartInfo.FileName = "java.exe";
             _p.StartInfo.Arguments = string.Join(" ",
                 JavaSystemProperties(),
