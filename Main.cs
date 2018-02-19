@@ -14,8 +14,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("heightmap2stl-gui")]
 [assembly: AssemblyProduct("heightmap2stl-gui")]
-[assembly: AssemblyVersion("1.3.3.0")]
-[assembly: AssemblyFileVersion("1.3.3.0")]
+[assembly: AssemblyVersion("1.3.4.0")]
+[assembly: AssemblyFileVersion("1.3.4.0")]
 
 namespace app
 {
@@ -58,9 +58,11 @@ namespace app
             Log($"Version: {GetVersion()}");
 
             // Autobackup
-            Boolean.TryParse(ConfigurationManager.AppSettings["AutoBackup"], out _autoBackup);
-            chkAutoBackup.Checked = _autoBackup;
-            Log($"AutoBackup: {_autoBackup}");
+            if (Boolean.TryParse(ConfigurationManager.AppSettings["AutoBackup"], out _autoBackup))
+            {
+                chkAutoBackup.Checked = _autoBackup;
+                Log($"AutoBackup: {_autoBackup}");
+            }
         }
 
         private Version GetVersion() => Assembly.GetEntryAssembly().GetName().Version;
@@ -95,9 +97,9 @@ namespace app
             var stlFile = new FileInfo(Path.Combine(outDirectory,
                 Path.GetFileNameWithoutExtension(rawFileName.FullName) + ".stl"));
 
+            Log($"Autobackup: {_autoBackup}");
             if (_autoBackup)
             {
-                Log($"Autobackup: {_autoBackup}");
                 var backupStlFile = new FileInfo(Path.Combine(
                     // Directory
                     outDirectory,
@@ -444,6 +446,11 @@ namespace app
         private void UpdateOutputPath()
         {
             txtOutputPath.Text = GetOutputPath();
+        }
+
+        private void chkAutoBackup_Click(object sender, EventArgs e)
+        {
+            _autoBackup = chkAutoBackup.Checked;
         }
     }
 }

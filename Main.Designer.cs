@@ -213,6 +213,7 @@
             this.chkAutoBackup.TabIndex = 19;
             this.chkAutoBackup.Text = "Auto Backup";
             this.chkAutoBackup.UseVisualStyleBackColor = true;
+            this.chkAutoBackup.Click += new System.EventHandler(this.chkAutoBackup_Click);
             // 
             // gbOutputPath
             // 
