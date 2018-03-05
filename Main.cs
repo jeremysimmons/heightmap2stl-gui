@@ -49,7 +49,7 @@ namespace app
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            
+
             // Initial output path
             SetOutputPath(GetOutputPath());
 
@@ -63,6 +63,8 @@ namespace app
                 chkAutoBackup.Checked = _autoBackup;
                 Log($"AutoBackup: {_autoBackup}");
             }
+
+            GetJavaPath(log: true);
         }
 
         private Version GetVersion() => Assembly.GetEntryAssembly().GetName().Version;
@@ -76,12 +78,6 @@ namespace app
         private void btnCreate_Click(object sender, EventArgs e)
         {
             ClearLog();
-
-            if (CheckForJavaInPath() == false)
-            {
-                Log("JAVA cannot be found. Download/Install from https://java.com");
-                return;
-            }
 
             if (GetInputFile() == null)
             {
@@ -140,7 +136,7 @@ namespace app
             var rawFileName = GetInputFile();
             _p = new Process();
             _p.StartInfo.WorkingDirectory = GetOutputPath();
-            _p.StartInfo.FileName = "java.exe";
+            _p.StartInfo.FileName = GetJavaPath(log: false);
             _p.StartInfo.Arguments = string.Join(" ",
                 JavaSystemProperties(),
                 "-jar",
@@ -172,9 +168,15 @@ namespace app
             Log(args.Data);
         }
 
+        private void LogIf(bool log, string text)
+        {
+            if (!log) return;
+            Log(text);
+        }
         // CrossThreadSafe
         private void Log(string text)
         {
+            if (string.IsNullOrEmpty(text)) return;
             if (txtLog.InvokeRequired)
             {
                 txtLog.Invoke(new Action<string>(Log), text);
@@ -231,21 +233,146 @@ namespace app
             return String.Join(" ", properties.Select(x => "-D" + x.Key + "=" + x.Value));
         }
 
-        // A standard java install will add java.exe to %PATH%
-        private bool CheckForJavaInPath()
+        private string GetJavaPath(bool log = false)
         {
+            string javaPath;
+            bool found = false;
+
+            // Check AppSettings for override to user-java
+            found = CheckforOverrideJava(out javaPath, log);
+            if (found) return javaPath;
+
+            // Check PATH environment variable
+            found = CheckForJavaInPathEnvironmentVariable(out javaPath, log);
+            if (found) return javaPath;
+
+            // Check for JAVA_HOME environment variable
+            found = CheckForJavaHome(out javaPath, log);
+            if (found) return javaPath;
+
+            // Check various known PROGRAM FILES envrionment variable
+            found = CheckForJavaInProgramFilesEnvironmentVariables(out javaPath, log);
+            if (found) return javaPath;
+
+            // Check AppSettings for last-ditch fallback
+            found = CheckForFallbackJava(out javaPath, log);
+            if (found) return javaPath;
+
+            return null; // no java to be found. boo-hoo.
+        }
+
+        private bool CheckforOverrideJava(out string javaPath, bool log)
+            => CheckForJavaInAppSetting("OverrideJava", out javaPath, log);
+
+        private bool CheckForFallbackJava(out string javaPath, bool log)
+            => CheckForJavaInAppSetting("FallbackJava", out javaPath, log);
+
+        private bool CheckForJavaInAppSetting(string appSetting, out string javaPath, bool log)
+        {
+            javaPath = null;
             try
             {
-                var psi = new ProcessStartInfo("java.exe", "-version");
-                psi.UseShellExecute = true;
+                string javaSetting = ConfigurationManager.AppSettings.Get(appSetting);
+                if (string.IsNullOrEmpty(javaSetting))
+                {
+                    LogIf(log, $"{appSetting} setting is empty");
+                    return false;
+                }
+                return CheckForJavaInDirectory(Path.GetDirectoryName(javaSetting), out javaPath);
+            }
+            catch (Exception ex)
+            {
+                LogIf(log, ex.ToString());
+            }
+            return false;
+        }
+
+        private bool CheckForJavaInDirectory(string directory, out string javaPath)
+        {
+            javaPath = null;
+            if (string.IsNullOrEmpty(directory)) return false;
+            try
+            {
+                var fullJavaPath = Path.Combine(directory, "java.exe");
+                var psi = new ProcessStartInfo(fullJavaPath, "-version");
+                psi.UseShellExecute = false;
+                psi.WorkingDirectory = directory;
                 var process = Process.Start(psi);
-                process?.WaitForExit(50000);
-                return process?.ExitCode == 0;
+                process?.WaitForExit(5000); // 5 seconds
+                bool found = process?.ExitCode == 0;
+                if (found) javaPath = fullJavaPath;
+                return found;
             }
             catch
             {
                 // ignored
             }
+            return false;
+        }
+
+        private bool CheckForJavaInPathEnvironmentVariable(out string foundJavaPath, bool log = false)
+        {
+            foundJavaPath = null;
+            foreach (string path in Environment.GetEnvironmentVariable("PATH").Split(';'))
+            {
+                string javaPath;
+                bool found = CheckForJavaInDirectory(path, out javaPath);
+                string message = (found ? "Found Java in Path directory: " : "Cannot find Java in path directory: ") + path;
+                LogIf(log, message);
+                if (found)
+                {
+                    foundJavaPath = Path.Combine(path, "java"); ;
+                    return found;
+                }
+            }
+            return false;
+        }
+
+        private bool CheckForJavaHome(out string javaPath, bool log = false)
+        {
+            javaPath = null;
+            var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
+            var javaHomeBin = Path.Combine(javaHome, "bin");
+            bool hasJavaHomeEnvironmentVar = false;
+            bool javaHomeDirectoryExists = false;
+            bool foundJavaExe = false;
+            hasJavaHomeEnvironmentVar = javaHome != null;
+            if (hasJavaHomeEnvironmentVar)
+            {
+                javaHomeDirectoryExists = Directory.Exists(javaHomeBin);
+                if (javaHomeDirectoryExists)
+                {
+                    foundJavaExe = CheckForJavaInDirectory(javaHomeBin, out javaPath);
+                    if (foundJavaExe)
+                    {
+                        javaPath = Path.Combine(javaHomeBin, "java.exe");
+                    }
+                }
+            }
+            LogIf(log, "JavaHome EnvironmentVariable: " + (hasJavaHomeEnvironmentVar ? javaHome : "-none"));
+            LogIf(log, "JavaHome Directory Exists: " + javaHomeDirectoryExists);
+            LogIf(log, "JavaHome Found Exe: " + foundJavaExe);
+            return foundJavaExe;
+        }
+
+        private bool CheckForJavaInProgramFilesEnvironmentVariables(out string javaPath, bool log = false)
+        {
+            javaPath = null;
+            var programFilesEnvironmentVariables = new[] { "ProgramFiles(x86)", "ProgramW6432", "ProgramFiles" };
+            foreach (string environmentVariable in programFilesEnvironmentVariables)
+            {
+                string directory = Environment.GetEnvironmentVariable(environmentVariable);
+                if (directory == null) continue;
+                var searchDir = Path.Combine(directory, "java");
+                var javaDirExists = Directory.Exists(searchDir);
+                if (!javaDirExists) continue;
+                string javaExe = Directory.GetFiles(searchDir, "java.exe", SearchOption.AllDirectories).FirstOrDefault();
+                bool found = javaExe != null && CheckForJavaInDirectory(Path.GetDirectoryName(javaExe), out javaPath);
+                string foundMessage = (found ? "cannot find java in" : "found java in");
+                string message = $"ProgramFilesEnvironmentVariable({environmentVariable}) {foundMessage} {searchDir}";
+                LogIf(log, message);
+                if (found) return true;
+            };
             return false;
         }
 
@@ -363,7 +490,7 @@ namespace app
             }
             else
             {
-                if(GetOutputPath() != Environment.CurrentDirectory)
+                if (GetOutputPath() != Environment.CurrentDirectory)
                 {
                     SetOutputPath(Environment.CurrentDirectory);
                 }
@@ -392,9 +519,9 @@ namespace app
 
         private FileInfo GetInputFile()
         {
-            return 
-                String.IsNullOrEmpty(txtInputFile.Text) ? 
-                    null : 
+            return
+                String.IsNullOrEmpty(txtInputFile.Text) ?
+                    null :
                     new FileInfo(txtInputFile.Text);
         }
 
@@ -415,7 +542,7 @@ namespace app
             }
 
             // same as input file
-            if(radOutSource.Checked)
+            if (radOutSource.Checked)
             {
                 // input file might not be set yet, fallback to current directory
                 var inputFile = GetInputFile();
@@ -424,12 +551,12 @@ namespace app
                     Log("No Input image specified. Output path will update when input is selected.");
                     return Environment.CurrentDirectory;
                 }
-                
+
                 // Use the directory of the input file if it's available, otherwise current directory
                 return inputFile.DirectoryName ?? Environment.CurrentDirectory;
             }
 
-            if(radOutCustom.Checked)
+            if (radOutCustom.Checked)
             {
                 if (string.IsNullOrEmpty(txtOutputPath.Text))
                 {
